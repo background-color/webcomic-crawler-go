@@ -8,6 +8,7 @@ require (
 	github.com/andybalholm/cascadia v1.3.2 // indirect
 	github.com/go-rod/rod v0.116.0 // indirect
 	github.com/go-sql-driver/mysql v1.8.1 // indirect
+	github.com/gorilla/feeds v1.1.2 // indirect
 	github.com/joho/godotenv v1.5.1 // indirect
 	github.com/ysmood/fetchup v0.2.3 // indirect
 	github.com/ysmood/goob v0.4.0 // indirect

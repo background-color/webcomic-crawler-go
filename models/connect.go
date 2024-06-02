@@ -2,29 +2,12 @@ package models
 
 import (
 	"database/sql"
-	"os"
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"github.com/joho/godotenv"
 )
 
-func DBConnect() (*sql.DB, error) {
-	var err error
-
-	// .envファイルを読み込む
-	err = godotenv.Load()
-	if err != nil {
-		//logger.Error("Error open .env file")
-		return nil, err
-	}
-
-	// 環境変数を変数に格納する
-	dbName := os.Getenv("DB_NAME")
-	dbUser := os.Getenv("DB_USER")
-	dbPass := os.Getenv("DB_PASS")
-	dbAddr := os.Getenv("DB_ADDRESS")
-
+func DBConnect(dbName string, dbUser string, dbPass string, dbAddr string) (*sql.DB, error) {
 	// 接続設定
 	locale, _ := time.LoadLocation("Asia/Tokyo")
 	c := mysql.Config{

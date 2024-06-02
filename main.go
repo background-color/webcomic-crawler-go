@@ -8,14 +8,19 @@ import (
 	"time"
 
 	"github.com/background-color/webcomic-crawler-go/models"
+	"github.com/background-color/webcomic-crawler-go/rss"
 	"github.com/go-rod/rod"
+	"github.com/joho/godotenv"
 )
 
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	logger.Debug("---------- start startCrawl()")
 
-	db, err := models.DBConnect()
+	// .envファイルを読み込む
+	godotenv.Load()
+
+	db, err := models.DBConnect(os.Getenv("DB_NAME"), os.Getenv("DB_USER"), os.Getenv("DB_PASS"), os.Getenv("DB_ADDRESS"))
 	if err != nil {
 		logger.Error("error", err)
 		return
@@ -39,7 +44,6 @@ where c.is_disabled = 0
 	defer browser.MustClose()
 
 	rows, err := db.Query(query)
-	defer rows.Close()
 	if err != nil {
 		logger.Error("Failed to execute query", slog.Any("error", err))
 		return
@@ -49,11 +53,12 @@ where c.is_disabled = 0
 	// 登録用
 	stmtIns, err := db.Prepare("INSERT INTO rss (`comic_id`, `check_text`) VALUES( ?, ? )")
 	if err != nil {
-		logger.Error("Failed to execute query", slog.Any("error", err))
+		logger.Error("Failed query", slog.Any("error", err))
 		return
 	}
 	defer stmtIns.Close()
 
+	// スクレイピング、変更があれば登録
 	for rows.Next() {
 		var (
 			id, name, url, checkField  string
@@ -77,5 +82,10 @@ where c.is_disabled = 0
 			stmtIns.Exec(id, elText)
 
 		}
+	}
+
+	err = rss.GenerateRSSFeed(db, os.Getenv("RSS_FILE_PATH"))
+	if err != nil {
+		logger.Error("Failed to generate RSS feed", slog.Any("error", err))
 	}
 }
