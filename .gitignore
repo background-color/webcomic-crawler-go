@@ -21,5 +21,6 @@
 go.work
 
 *.env
+*.env.prod
 *.xml
 *.log
