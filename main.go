@@ -2,7 +2,7 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
+	"log"
 	"log/slog"
 	"os"
 	"time"
@@ -10,17 +10,26 @@ import (
 	"github.com/background-color/webcomic-crawler-go/models"
 	"github.com/background-color/webcomic-crawler-go/rss"
 	"github.com/go-rod/rod"
+	"github.com/go-rod/rod/lib/launcher"
 	"github.com/joho/godotenv"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
-	logger.Debug("---------- start startCrawl()")
-
 	// .envファイルを読み込む
 	godotenv.Load()
 
-	db, err := models.DBConnect(os.Getenv("DB_NAME"), os.Getenv("DB_USER"), os.Getenv("DB_PASS"), os.Getenv("DB_ADDRESS"))
+	logger, err := GetLogger(os.Getenv("LOG_FILE_PATH"))
+	if err != nil {
+		return
+	}
+	logger.Info("---------- start")
+
+	db, err := models.DBConnect(
+		os.Getenv("DB_NAME"),
+		os.Getenv("DB_USER"),
+		os.Getenv("DB_PASS"),
+		os.Getenv("DB_ADDRESS"),
+	)
 	if err != nil {
 		logger.Error("error", err)
 		return
@@ -39,8 +48,16 @@ left join (select comic_id, max(id) as id from rss group by comic_id) as r_max o
 left join rss as r on r_max.id = r.id
 where c.is_disabled = 0
 `
+	// CHROMIUM_PATHが指定されていればそれを使う
+	var browser *rod.Browser
+	chromiumPath := os.Getenv("CHROMIUM_PATH")
+	if chromiumPath != "" {
+		u := launcher.New().Bin(chromiumPath).MustLaunch()
+		browser = rod.New().ControlURL(u).MustConnect()
+	} else {
+		browser = rod.New().MustConnect()
+	}
 
-	browser := rod.New().MustConnect()
 	defer browser.MustClose()
 
 	rows, err := db.Query(query)
@@ -70,14 +87,17 @@ where c.is_disabled = 0
 			return
 		}
 
-		fmt.Printf("ID: %v, Name: %s, URL: %s\n", id, name, url)
+		logger.Info("site", "id", id, "name", name, "url", url)
 
 		page := browser.MustPage(url)
-		elText := page.Timeout(10 * time.Second).MustElement(checkField).MustText()
-		fmt.Printf("タイトル: %s\n", elText)
+		// defer page.MustClose()
+
+		elText := page.Timeout(5 * time.Second).MustElement(checkField).MustText()
+		page.MustClose()
+
+		logger.Info("get element", "タイトル", elText)
 
 		if elText != checkText.String {
-			fmt.Printf("更新")
 			logger.Info("update: id", id, elText)
 			stmtIns.Exec(id, elText)
 
@@ -88,4 +108,25 @@ where c.is_disabled = 0
 	if err != nil {
 		logger.Error("Failed to generate RSS feed", slog.Any("error", err))
 	}
+	logger.Info("---------- end")
+}
+
+func GetLogger(logFilePath string) (*slog.Logger, error) {
+	// ログ出力先
+	if logFilePath == "" {
+		logFilePath = "log/sample.log"
+	}
+
+	// ログファイルを開く（存在しない場合は作成）
+	file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
+	if err != nil {
+		log.Fatalf("Failed to open log file: %v", err)
+	}
+	defer file.Close()
+
+	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	if err != nil {
+		return nil, err
+	}
+	return slog.New(slog.NewJSONHandler(logfile, nil)), nil
 }

@@ -11,14 +11,15 @@ func DBConnect(dbName string, dbUser string, dbPass string, dbAddr string) (*sql
 	// 接続設定
 	locale, _ := time.LoadLocation("Asia/Tokyo")
 	c := mysql.Config{
-		DBName:    dbName,
-		User:      dbUser,
-		Passwd:    dbPass,
-		Addr:      dbAddr,
-		Net:       "tcp",
-		Collation: "utf8mb4_general_ci",
-		ParseTime: true,
-		Loc:       locale,
+		DBName:               dbName,
+		User:                 dbUser,
+		Passwd:               dbPass,
+		Addr:                 dbAddr,
+		Net:                  "tcp",
+		Collation:            "utf8mb4_general_ci",
+		ParseTime:            true,
+		Loc:                  locale,
+		AllowNativePasswords: true,
 	}
 
 	db, err := sql.Open("mysql", c.FormatDSN())
