@@ -36,7 +36,7 @@ func GenerateRSSFeed(db *sql.DB, filePath string) error {
 func fetchRSSRows(db *sql.DB) (*sql.Rows, error) {
 	const rssQuery = `
 		SELECT t1.id, t1.check_text, t2.name, t2.url, t1.ins
-		FROM rss AS t1 
+		FROM rss AS t1
 		INNER JOIN comic AS t2 ON t1.comic_id = t2.id
 		ORDER BY t1.id DESC
 		LIMIT 30
@@ -48,8 +48,8 @@ func fetchRSSRows(db *sql.DB) (*sql.Rows, error) {
 func createFeed(rows *sql.Rows) (*feeds.Feed, error) {
 	now := time.Now()
 	feed := &feeds.Feed{
-		Title:       "ALL RSS",
-		Link:        &feeds.Link{Href: "rss.background-color.jp"},
+		Title:       "WEB COMIC RSS",
+		Link:        &feeds.Link{Href: "https://rss.background-color.jp/rss"},
 		Description: "WEB COMIC RSS",
 		Created:     now,
 	}
