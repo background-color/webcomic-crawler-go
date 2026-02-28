@@ -11,6 +11,7 @@ import (
 	"github.com/background-color/webcomic-crawler-go/rss"
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
+	"github.com/go-rod/rod/lib/proto"
 	"github.com/joho/godotenv"
 )
 
@@ -51,12 +52,15 @@ where c.is_disabled = 0
 	// CHROMIUM_PATHが指定されていればそれを使う
 	var browser *rod.Browser
 	chromiumPath := os.Getenv("CHROMIUM_PATH")
+	l := launcher.New().
+		Set("no-sandbox", "").
+		Set("disable-gpu", "").
+		Set("disable-dev-shm-usage", "")
 	if chromiumPath != "" {
-		u := launcher.New().Bin(chromiumPath).MustLaunch()
-		browser = rod.New().ControlURL(u).MustConnect()
-	} else {
-		browser = rod.New().MustConnect()
+		l = l.Bin(chromiumPath)
 	}
+	u := l.MustLaunch()
+	browser = rod.New().ControlURL(u).MustConnect()
 
 	defer browser.MustClose()
 
@@ -68,7 +72,7 @@ where c.is_disabled = 0
 	defer rows.Close()
 
 	// 登録用
-	stmtIns, err := db.Prepare("INSERT INTO rss (`comic_id`, `check_text`) VALUES( ?, ? )")
+	stmtIns, err := db.Prepare("INSERT INTO rss (`comic_id`, `check_text`, `ins`) VALUES( ?, ?, NOW() )")
 	if err != nil {
 		logger.Error("Failed query", slog.Any("error", err))
 		return
@@ -89,10 +93,29 @@ where c.is_disabled = 0
 
 		logger.Info("site", "id", id, "name", name, "url", url)
 
-		page := browser.MustPage(url)
-		// defer page.MustClose()
+		page, err := browser.Page(proto.TargetCreateTarget{URL: url})
+		if err != nil {
+			logger.Error("Failed to open page", "name", name, slog.Any("error", err))
+			continue
+		}
 
-		elText := page.Timeout(5 * time.Second).MustElement(checkField).MustText()
+		if err := page.WaitLoad(); err != nil {
+			logger.Error("Failed to wait for page load", "name", name, slog.Any("error", err))
+			page.MustClose()
+			continue
+		}
+		el, err := page.Timeout(30 * time.Second).Element(checkField)
+		if err != nil {
+			logger.Error("Failed to find element", "name", name, "checkField", checkField, slog.Any("error", err))
+			page.MustClose()
+			continue
+		}
+		elText, err := el.Text()
+		if err != nil {
+			logger.Error("Failed to get text", "name", name, slog.Any("error", err))
+			page.MustClose()
+			continue
+		}
 		page.MustClose()
 
 		logger.Info("get element", "タイトル", elText)

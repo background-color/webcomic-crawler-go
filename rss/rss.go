@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/gorilla/feeds"
@@ -77,10 +78,12 @@ func createFeedItem(rows *sql.Rows) (*feeds.Item, error) {
 	}
 
 	return &feeds.Item{
+		Id:          strconv.Itoa(rssItem.Id),
 		Title:       rssItem.Name,
 		Link:        &feeds.Link{Href: rssItem.Url},
 		Description: rssItem.CheckText,
 		Created:     rssItem.Ins,
+		Updated:     rssItem.Ins,
 	}, nil
 }
 
