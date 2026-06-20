@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"log"
 	"log/slog"
 	"os"
 	"time"
@@ -32,7 +31,7 @@ func main() {
 		os.Getenv("DB_ADDRESS"),
 	)
 	if err != nil {
-		logger.Error("error", err)
+		logger.Error("DBConnect failed", slog.Any("error", err))
 		return
 	}
 	defer db.Close()
@@ -60,6 +59,7 @@ where c.is_disabled = 0
 		l = l.Bin(chromiumPath)
 	}
 	u := l.MustLaunch()
+	defer l.Cleanup()
 	browser = rod.New().ControlURL(u).MustConnect()
 
 	defer browser.MustClose()
@@ -71,7 +71,6 @@ where c.is_disabled = 0
 	}
 	defer rows.Close()
 
-	// 登録用
 	stmtIns, err := db.Prepare("INSERT INTO rss (`comic_id`, `check_text`, `ins`) VALUES( ?, ?, NOW() )")
 	if err != nil {
 		logger.Error("Failed query", slog.Any("error", err))
@@ -122,8 +121,9 @@ where c.is_disabled = 0
 
 		if elText != checkText.String {
 			logger.Info("update: id", id, elText)
-			stmtIns.Exec(id, elText)
-
+			if _, err := stmtIns.Exec(id, elText); err != nil {
+				logger.Error("Failed to insert", "id", id, slog.Any("error", err))
+			}
 		}
 	}
 
@@ -135,19 +135,11 @@ where c.is_disabled = 0
 }
 
 func GetLogger(logFilePath string) (*slog.Logger, error) {
-	// ログ出力先
 	if logFilePath == "" {
 		logFilePath = "log/sample.log"
 	}
 
-	// ログファイルを開く（存在しない場合は作成）
-	file, err := os.OpenFile(logFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	if err != nil {
-		log.Fatalf("Failed to open log file: %v", err)
-	}
-	defer file.Close()
-
-	logfile, err := os.OpenFile(logFilePath, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+	logfile, err := os.OpenFile(logFilePath, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0666)
 	if err != nil {
 		return nil, err
 	}
